@@ -1,0 +1,59 @@
+# Render Blueprint — 10-day trial host
+# Dashboard: New → Blueprint → connect this repo
+# Docs: docs/TRIAL_HOST.md
+
+databases:
+  - name: placement
+    plan: basic-256mb
+    databaseName: placement
+    user: placement
+
+services:
+  - type: web
+    name: placement-portal
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: placement
+          property: connectionString
+      # Render also injects RENDER_EXTERNAL_URL (used as CLIENT_ORIGIN fallback).
+      - key: JWT_SECRET
+        generateValue: true
+      # Trial host only — never enable these on a real college production DB.
+      - key: SEED_ON_START
+        value: "true"
+      - key: ALLOW_DEMO_SEED
+        value: "true"
+      - key: SEED_FORCE_PASSWORD_CHANGE
+        value: "true"
+      # Lets trial demos sign in with changeme123, but API forces password change.
+      - key: ALLOW_DEMO_SEED_PASSWORD
+        value: "true"
+      - key: RESULTS_AUTO_RELEASE_MINUTES
+        value: "30"
+      - key: SESSION_HOURS
+        value: "2"
+      - key: SESSION_WARN_MINUTES
+        value: "5"
+      # Capacity / load (scale web instances to match API_REPLICAS on exam day).
+      - key: TRUST_PROXY
+        value: "1"
+      - key: EXPECTED_CONCURRENT_USERS
+        value: "1000"
+      - key: API_REPLICAS
+        value: "1"
+      - key: DB_POOL_SIZE
+        value: "15"
+      # After creating the Netlify site, set this to https://YOUR-SITE.netlify.app
+      # so login cookies work from the Netlify UI. Until then, same-origin Render UI works.
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false

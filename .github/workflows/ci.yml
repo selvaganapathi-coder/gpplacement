@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: file:./ci.db
+      - name: Unit tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+      - name: Build UI
+        run: npm run build:ui
+        env:
+          VITE_API_URL: https://example.onrender.com
+      - name: Typecheck server
+        run: npx tsc -p tsconfig.server.json --noEmit
+        env:
+          DATABASE_URL: file:./ci.db

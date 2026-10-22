@@ -1,0 +1,680 @@
+generator client {
+
+  provider      = "prisma-client-js"
+  // native = local Windows/Mac; rhel = Netlify Functions (AWS Lambda)
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+
+}
+
+
+
+datasource db {
+
+  // Local default: SQLite. For Render/hosted Postgres, set provider = "postgresql"
+  // and DATABASE_URL to a postgres:// URL (see docs/TRIAL_HOST.md).
+  provider = "sqlite"
+
+  url      = env("DATABASE_URL")
+
+}
+
+
+
+enum Role {
+  STUDENT
+  FACULTY
+  STAFF
+  ADMIN
+  SUPER_ADMIN
+}
+
+/// Course / department codes — configurable per college via AcademicProgram labels.
+/// Assessment engine treats these as opaque audience keys, not pharmacy-specific logic.
+enum Program {
+  ENGINEERING
+  CSE
+  IT
+  SCIENCE
+  ARTS
+  MANAGEMENT
+  COMMERCE
+  DPHARM
+  BPHARM
+  MPHARM
+  PHARMD
+  OTHER
+}
+
+enum LevelType {
+  YEAR
+  SEMESTER
+}
+
+enum AttemptStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  EXPIRED
+  CANCELLED
+}
+
+enum QuestionType {
+  SINGLE_MCQ
+  MULTI_MCQ
+  TRUE_FALSE
+  FILL_BLANK
+  DESCRIPTIVE
+  CODING
+  NUMERICAL
+  CASE_BASED
+}
+
+enum QuestionItemStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+
+
+model User {
+
+  id            String             @id @default(cuid())
+
+  email         String             @unique
+
+  passwordHash  String
+
+  mustChangePassword Boolean @default(false)
+
+  failedLoginCount Int @default(0)
+
+  lockedUntil   DateTime?
+
+  tokenVersion  Int @default(0)
+
+  name          String
+
+  role          Role
+
+  program       Program?
+
+  levelType     LevelType?
+
+  level         Int?
+
+  /// Class section A or B (with year).
+  section       String?
+
+  /// Class roll / register number (students). Sorted numerically when possible.
+  rollNo        String?
+
+  /// Enrollment / employment status. Inactive users keep history but cannot sign in.
+  isActive      Boolean            @default(true)
+
+  /// TOTP 2FA (Authenticator). Secret is AES-GCM encrypted at rest (enc:v1:…); never returned after setup except once.
+  totpEnabled   Boolean            @default(false)
+  totpSecret    String?
+  totpVerifiedAt DateTime?
+  /// JSON array of SHA-256 hashes of one-time recovery codes.
+  totpRecoveryHashes String?
+
+  /// Password reset — store only SHA-256 of the raw token.
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+
+  createdAt     DateTime           @default(now())
+
+  attempts      TestAttempt[]
+
+  createdTests  Test[]             @relation("TestAuthor")
+
+  lastEditedTests Test[]           @relation("TestLastEditor")
+
+  staffOf       StaffAssignment[]  @relation("AssignedStaff")
+
+  assignedTo    StaffAssignment[]  @relation("AssignedStudent")
+
+  branchScopes  StaffBranchScope[] @relation("StaffScopes")
+
+  sessions      Session[]
+
+  skillScores   StudentSkillScore[]
+
+  createdBanks  QuestionBank[]      @relation("BankAuthor")
+  bankQuestions BankQuestion[]      @relation("BankQuestionAuthor")
+
+  @@index([role, program, levelType, level, section])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  expiresAt        DateTime
+  /// SHA-256 of the current refresh token (rotated on each refresh).
+  refreshTokenHash String?
+  refreshExpiresAt DateTime?
+  revokedAt        DateTime?
+  revokeReason     String?
+  userAgent        String?
+  ip               String?
+
+  @@unique([refreshTokenHash])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model StaffAssignment {
+
+  id        String   @id @default(cuid())
+
+  staffId   String
+
+  staff     User     @relation("AssignedStaff", fields: [staffId], references: [id], onDelete: Cascade)
+
+  studentId String
+
+  student   User     @relation("AssignedStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+
+
+  @@unique([staffId, studentId])
+
+  @@index([staffId])
+
+  @@index([studentId])
+
+}
+
+
+
+model StaffBranchScope {
+
+  id        String     @id @default(cuid())
+
+  staffId   String
+
+  staff     User       @relation("StaffScopes", fields: [staffId], references: [id], onDelete: Cascade)
+
+  program   Program
+
+  levelType LevelType?
+
+  level     Int?
+
+  /// Class section A or B (null = whole year / dept scope).
+  section   String?
+
+  scopeKey  String
+
+  createdAt DateTime   @default(now())
+
+
+
+  @@unique([staffId, scopeKey])
+
+  @@index([staffId])
+
+}
+
+
+
+model Test {
+
+  id          String        @id @default(cuid())
+
+  title       String
+
+  description String?
+
+  durationMin Int           @default(30)
+
+  /// How many MCQ items each student gets from the bank (null = all questions).
+  questionsPerAttempt Int?
+
+  /// JSON blueprint e.g. {"easy":20,"medium":20,"hard":10} or {"easyPct":40,"mediumPct":40,"hardPct":20}
+  difficultyBlueprint String?
+
+  /// Pass mark as percent (0–100). null = no pass threshold.
+  passPercentage Int?
+
+  /// Deduct marks for wrong answers when enabled.
+  negativeMarking Boolean @default(false)
+
+  /// Max attempts per student (1 = no retake unless allowRetake). null = use allowRetake flag.
+  maxAttempts Int?
+
+  /// Total marks for the paper (defaults to Σ question marks for MCQ).
+  totalMarks Int?
+
+  isPublished       Boolean   @default(false)
+  resultsPublished  Boolean   @default(false)
+  resultsPublishedAt DateTime?
+  allowRetake       Boolean   @default(false)
+  availableFrom     DateTime?
+  availableUntil    DateTime?
+  program        Program?
+  levelType      LevelType?
+  level          Int?
+  /// Class section A or B (null = all sections / open test).
+  section        String?
+  /// Module 1 topic for this test (applies to the whole paper)
+  topic          String?
+  /// EASY | MEDIUM | HARD for this test
+  difficulty     String?
+  /// APTITUDE | TECHNICAL | ENGLISH | COMMUNICATION | PRESENTATION | GD | …
+  assessmentType String  @default("APTITUDE")
+  /// Max marks (MCQ: Σ question marks or avg × questionsPerAttempt)
+  maxScore       Int     @default(100)
+
+  /// Optional reusable question bank this assessment draws from.
+  questionBankId String?
+  questionBank   QuestionBank? @relation(fields: [questionBankId], references: [id])
+
+  /// Optional primary category for the assessment.
+  categoryId String?
+  category   QuestionCategory? @relation(fields: [categoryId], references: [id])
+
+  createdById String
+
+  createdBy   User          @relation("TestAuthor", fields: [createdById], references: [id])
+
+  /// Staff/admin who last saved content edits (questions, rules, audience).
+  lastEditedById String?
+  lastEditedBy   User?      @relation("TestLastEditor", fields: [lastEditedById], references: [id])
+  lastEditedAt   DateTime?
+
+  questions   Question[]
+
+  attempts    TestAttempt[]
+
+  createdAt   DateTime      @default(now())
+
+  @@index([program, levelType, level])
+  @@index([questionBankId])
+  @@index([lastEditedById])
+}
+
+model Question {
+
+  id       String          @id @default(cuid())
+
+  testId   String
+
+  test     Test            @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  prompt   String
+
+  questionType QuestionType @default(SINGLE_MCQ)
+
+  categoryId String?
+  category   QuestionCategory? @relation(fields: [categoryId], references: [id])
+
+  /// Optional topic / sub-category tag for analytics
+  topic    String?
+
+  /// Optional difficulty: EASY | MEDIUM | HARD
+  difficulty String?
+
+  marks          Float @default(1)
+  negativeMarks  Float @default(0)
+
+  explanation String?
+
+  /// Comma-separated or JSON tags
+  tags String?
+
+  status QuestionItemStatus @default(ACTIVE)
+
+  /// Originating bank question (for no-repeat + quality analytics).
+  sourceBankQuestionId String?
+
+  order    Int
+
+  options  Option[]
+
+  answers  StudentAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([sourceBankQuestionId])
+}
+
+model Option {
+
+  id         String          @id @default(cuid())
+
+  questionId String
+
+  question   Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  text       String
+
+  isCorrect  Boolean         @default(false)
+
+  answers    StudentAnswer[]
+
+}
+
+model TestAttempt {
+
+  id          String          @id @default(cuid())
+
+  testId      String
+
+  test        Test            @relation(fields: [testId], references: [id])
+
+  userId      String
+
+  user        User            @relation(fields: [userId], references: [id])
+
+  startedAt   DateTime        @default(now())
+
+  /// Server-authoritative deadline (startedAt + duration, capped by test window).
+  endsAt      DateTime?
+
+  /// When the attempt was closed (submit / auto-submit). Not the deadline.
+  endedAt     DateTime?
+
+  submittedAt DateTime?
+
+  status      AttemptStatus   @default(IN_PROGRESS)
+
+  attemptNumber Int           @default(1)
+
+  /// Non-null while IN_PROGRESS (`userId:testId`). Unique → at most one active attempt per student+test.
+  openLock    String?         @unique
+
+  score       Int?
+
+  percentage  Float?
+
+  /// Note for faculty / practical / self assessment
+  scoreNote   String?
+
+  /// Staff who entered a faculty or practical score
+  scoredById  String?
+
+  tabSwitchCount      Int     @default(0)
+
+  fullscreenExitCount Int     @default(0)
+
+  proctorFlagged      Boolean   @default(false)
+
+  /// Frozen draw for this attempt: {"questionIds":[...],"optionIdsByQuestion":{...}}
+  /// Created once on first start; never regenerated on refresh.
+  questionPlan        String?
+
+  /// JSON array of question ids marked for review during the attempt.
+  markedForReview     String?
+
+  answers     StudentAnswer[]
+
+  @@index([userId, testId])
+  @@index([status])
+}
+
+
+
+model StudentAnswer {
+
+  id         String      @id @default(cuid())
+
+  attemptId  String
+
+  attempt    TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId String
+
+  question   Question    @relation(fields: [questionId], references: [id])
+
+  optionId   String?
+
+  option     Option?     @relation(fields: [optionId], references: [id])
+
+
+
+  @@unique([attemptId, questionId])
+
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  /// Actor user id, or "anonymous" / "system" when no user session.
+  actorId    String
+  actorEmail String
+  actorRole  String?
+  action     String
+  /// Target entity type (User, Test, TestAttempt, …) — exposed as targetType in API.
+  entityType String?
+  entityId   String?
+  success    Boolean  @default(true)
+  ip         String?
+  userAgent  String?
+  /// JSON blob — never store passwords or tokens here.
+  meta       String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([action])
+  @@index([success])
+}
+
+/// Module 2 — Skill Master categories (career-readiness weights on category).
+model SkillCategory {
+  id          String   @id
+  label       String
+  description String?
+  /// Career readiness weight percent (Sprint 5 defaults sum to 100)
+  weightPct   Int      @default(10)
+  sortOrder   Int      @default(0)
+  /// ACTIVE | INACTIVE
+  status      String   @default("ACTIVE")
+  skills      Skill[]
+  scores      StudentSkillScore[]
+}
+
+model Skill {
+  id          String        @id @default(cuid())
+  categoryId  String
+  category    SkillCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  /// EASY | MEDIUM | HARD
+  difficulty  String        @default("MEDIUM")
+  /// Relative weight within category (default 1)
+  weight      Float         @default(1)
+  /// ACTIVE | INACTIVE (soft-delete)
+  status      String        @default("ACTIVE")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  programs    SkillProgram[]
+  semesters   SkillSemester[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([name])
+}
+
+model SkillProgram {
+  id       String  @id @default(cuid())
+  skillId  String
+  skill    Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  program  Program
+
+  @@unique([skillId, program])
+  @@index([program])
+}
+
+model SkillSemester {
+  id        String    @id @default(cuid())
+  skillId   String
+  skill     Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  program   Program
+  levelType LevelType
+  level     Int
+
+  @@unique([skillId, program, levelType, level])
+  @@index([program, levelType, level])
+}
+
+/// Demo / readiness category percent for a student (Sprint 1 seed support).
+model StudentSkillScore {
+  id         String        @id @default(cuid())
+  studentId  String
+  student    User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   SkillCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  percent    Int
+  source     String?
+  updatedAt  DateTime      @default(now()) @updatedAt
+
+  @@unique([studentId, categoryId])
+  @@index([studentId])
+}
+
+/// College-level branding & assessment settings (single-row config).
+model CollegeSettings {
+  id           String @id @default("default")
+  name         String @default("G.P. Pharmacy College")
+  shortName    String @default("GP Pharmacy")
+  tagline      String @default("The Future of Pharmacy")
+  emailDomain  String @default("gppharmacy.edu")
+  /// Comma-separated joining years, e.g. 2023,2024,2025,2026,2027
+  batchYears   String @default("2023,2024,2025,2026,2027")
+  /// JSON array of admin-created departments: {program,name,durationYears}
+  extraDepartments String @default("[]")
+  updatedAt    DateTime @updatedAt
+}
+
+/// Campus-wide announcements (student notification bell).
+model CampusAnnouncement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  active      Boolean   @default(true)
+  createdById String
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+
+  @@index([active, createdAt])
+}
+
+/// Admin-managed question categories (Aptitude, Reasoning, Programming, …).
+model QuestionCategory {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  parentId    String?
+  parent      QuestionCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    QuestionCategory[] @relation("CategoryTree")
+  sortOrder   Int     @default(0)
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  questions     Question[]
+  bankQuestions BankQuestion[]
+  assessments   Test[]
+}
+
+/// Reusable question bank (not tied to a single assessment).
+model QuestionBank {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  /// Optional audience scope (opaque program code).
+  program     Program?
+  /// ACTIVE | ARCHIVED
+  status      String   @default("ACTIVE")
+  /// Snapshot version (increments on freeze/clone).
+  version     Int      @default(1)
+  /// When set, bank is frozen — only admin may edit.
+  frozenAt    DateTime?
+  /// Clone / version lineage.
+  parentBankId String?
+  parentBank   QuestionBank?  @relation("BankLineage", fields: [parentBankId], references: [id])
+  childBanks   QuestionBank[] @relation("BankLineage")
+  /// Optional M.Pharm specialization leaf (e.g. Pharmaceutics).
+  specialization String?
+  createdById String
+  createdBy   User     @relation("BankAuthor", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions BankQuestion[]
+  tests     Test[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([specialization])
+  @@index([parentBankId])
+}
+
+model BankQuestion {
+  id           String             @id @default(cuid())
+  bankId       String
+  bank         QuestionBank       @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  prompt       String
+  questionType QuestionType       @default(SINGLE_MCQ)
+  categoryId   String?
+  category     QuestionCategory?  @relation(fields: [categoryId], references: [id])
+  subCategory  String?
+  difficulty   String?
+  marks        Float              @default(1)
+  negativeMarks Float             @default(0)
+  explanation  String?
+  tags         String?
+  status       QuestionItemStatus @default(ACTIVE)
+  /// Shared case stem id (groups multiple MCQs under one clinical case).
+  caseBlockId  String?
+  /// Case narrative (usually stored on each linked question for portability).
+  caseStem     String?
+  createdById  String?
+  createdBy    User?              @relation("BankQuestionAuthor", fields: [createdById], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  options      BankOption[]
+
+  @@index([bankId])
+  @@index([categoryId])
+  @@index([difficulty])
+  @@index([status])
+  @@index([caseBlockId])
+}
+
+model BankOption {
+  id         String       @id @default(cuid())
+  questionId String
+  question   BankQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean      @default(false)
+}
+
+/// Fine-grained permissions (role → permission codes).
+model Permission {
+  id          String @id @default(cuid())
+  code        String @unique
+  module      String
+  description String?
+  roleGrants  RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         Role
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+

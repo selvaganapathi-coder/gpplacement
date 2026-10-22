@@ -1,0 +1,32 @@
+[
+  {
+    "prompt": "If a medicine price rises 20% from ₹100, the new price is:",
+    "options": ["₹110", "₹120", "₹125", "₹80"],
+    "correctIndex": 1,
+    "marks": 1,
+    "category": "Aptitude",
+    "topic": "Percentages",
+    "difficulty": "EASY",
+    "tags": "math, percentages"
+  },
+  {
+    "prompt": "Find the odd one in the series: 2, 4, 8, 16, 34",
+    "options": ["2", "16", "34", "8"],
+    "correctIndex": 2,
+    "marks": 2,
+    "category": "Logical Reasoning",
+    "topic": "Number series",
+    "difficulty": "MEDIUM",
+    "tags": "series"
+  },
+  {
+    "prompt": "Which dosage form is typically sterile?",
+    "options": ["Tablet", "Capsule", "Injectable solution", "Syrup"],
+    "correctIndex": 2,
+    "marks": 1,
+    "category": "Pharmacy Technical",
+    "topic": "Dosage forms",
+    "difficulty": "EASY",
+    "tags": "pharmaceutics, sterile"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "name": "gp-pharmacy-placement",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Root helper — run apps from frontend/ and backend/",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:ui\"",
+    "dev:ui": "npm run dev --prefix frontend",
+    "dev:api": "npm run dev --prefix backend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend",
+    "build:ui": "npm run build --prefix frontend",
+    "build:api": "npm run build --prefix backend",
+    "netlify:build": "npm run build --prefix frontend && npm run build --prefix backend"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.8.2",
+    "concurrently": "^9.1.2",
+    "serverless-http": "^3.2.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

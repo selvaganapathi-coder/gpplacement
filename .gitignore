@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+dist-server
+.env
+.env.local
+*.db
+*.db-journal
+backend/backups/
+
+# Local Netlify folder
+.netlify

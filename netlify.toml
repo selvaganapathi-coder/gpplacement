@@ -1,0 +1,39 @@
+# Netlify — UI + Express API (Functions) on same *.netlify.app origin
+# UTF-8 without BOM (required for Netlify TOML parse)
+
+[build]
+  base = "."
+  command = "npm run netlify:build"
+  publish = "frontend/dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  SEED_FORCE_PASSWORD_CHANGE = "false"
+  SESSION_HOURS = "8"
+  NODE_ENV = "production"
+
+[functions]
+  node_bundler = "nft"
+  external_node_modules = ["@prisma/client", "prisma"]
+  included_files = [
+    "backend/dist-server/**",
+    "backend/prisma/dev.db",
+    "backend/prisma/schema.prisma",
+    "backend/node_modules/.prisma/**",
+    "backend/node_modules/@prisma/client/**",
+    "backend/node_modules/@prisma/engines/**"
+  ]
+
+# Same-origin API → Function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback (after /api)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

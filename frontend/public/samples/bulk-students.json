@@ -1,0 +1,24 @@
+[
+  {
+    "email": "student.bpharm.y1.01@gppharmacy.edu",
+    "name": "B.Pharm Y1 Student 01",
+    "program": "BPHARM",
+    "levelType": "YEAR",
+    "level": 1,
+    "rollNo": "01",
+    "role": "Student"
+  },
+  {
+    "name": "D.Pharm Y2 Student 05",
+    "program": "DPHARM",
+    "level": 2,
+    "rollNo": "05",
+    "role": "Student"
+  },
+  {
+    "email": "staff.bpharm@gppharmacy.edu",
+    "name": "B.Pharm Staff",
+    "program": "BPHARM",
+    "role": "Staff"
+  }
+]

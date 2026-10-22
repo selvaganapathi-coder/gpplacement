@@ -1,0 +1,14 @@
+# Netlify — static UI. Point site base directory to "frontend".
+# Set VITE_API_URL in Netlify UI to your Render API URL.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
