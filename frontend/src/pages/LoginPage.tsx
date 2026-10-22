@@ -12,7 +12,9 @@ const authErrors: Record<string, string> = {
 };
 
 /** Demo helpers are local-dev only — never ship passwords in production UI. */
-const SHOW_DEMO_LOGIN = import.meta.env.DEV;
+/** Demo role buttons: always in dev; on hosted demos set VITE_SHOW_DEMO_LOGIN=true. */
+const SHOW_DEMO_LOGIN =
+  import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGIN === "true";
 const DEMO_PASSWORD = "changeme123";
 
 /** Only warn about missing API after a real failed call — same-origin /api works on Netlify Functions. */

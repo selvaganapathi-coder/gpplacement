@@ -5114,9 +5114,11 @@ async function ensureDefaultCategories() {
   }
 }
 
-/** Skip listen on Netlify Functions / Lambda (they import `app` only). */
+/** Skip listen on Netlify / Vercel Functions / Lambda (they import `app` only). */
 const isServerless =
-  !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  !!process.env.NETLIFY ||
+  !!process.env.VERCEL ||
+  !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
 if (!isServerless) {
   app

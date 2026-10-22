@@ -10,3 +10,5 @@ backend/backups/
 
 # Local Netlify folder
 .netlify
+*.db-wal
+*.db-shm

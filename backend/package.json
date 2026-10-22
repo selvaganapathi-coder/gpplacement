@@ -27,7 +27,8 @@
     "check:cors": "tsx server/corsOrigins.check.ts",
     "check:security-headers": "tsx server/securityHeaders.check.ts",
     "check:auth-hardening": "tsx server/authHardening.check.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "vercel:build": "prisma generate && tsc -p tsconfig.json && node scripts/build-demo-db.cjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
