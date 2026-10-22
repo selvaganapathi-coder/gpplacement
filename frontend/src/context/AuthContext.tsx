@@ -68,6 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [warnOpen, setWarnOpen] = useState(false);
   const lastTouchRef = useRef(0);
   const expiresAtRef = useRef<number | null>(null);
+  // Only a signed-in visitor can have a session "end"; anonymous pages (forgot/reset password)
+  // must not be bounced to /login by the failed silent refresh in fetchMe().
+  const userRef = useRef<User | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const clearSessionNotice = useCallback(() => setSessionNotice(null), []);
 
@@ -100,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return onSessionEnded(({ message }) => {
+      if (!userRef.current) return;
       endLocalSession(message);
       if (!window.location.pathname.startsWith("/login")) {
         const q = new URLSearchParams({ notice: message });
