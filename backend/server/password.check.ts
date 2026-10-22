@@ -55,6 +55,11 @@ async function main() {
   process.env.ALLOW_DEMO_SEED_PASSWORD = "true";
   check("trial.allow_demo_seed", allowDemoSeed());
   check("trial.allow_demo_password", allowDemoSeedPasswordLogin());
+  delete process.env.SEED_FORCE_PASSWORD_CHANGE;
+  check("trial.still_forces_change_by_default", seedForcePasswordChange());
+  process.env.SEED_FORCE_PASSWORD_CHANGE = "false";
+  check("public_demo.no_forced_change", !seedForcePasswordChange());
+  delete process.env.SEED_FORCE_PASSWORD_CHANGE;
 
   process.env.NODE_ENV = prev;
   delete process.env.ALLOW_DEMO_SEED;

@@ -42,8 +42,20 @@ export function allowDemoSeed(): boolean {
  * Dev/demo: default true unless SEED_FORCE_PASSWORD_CHANGE=false.
  */
 export function seedForcePasswordChange(): boolean {
-  if (process.env.NODE_ENV === "production") return true;
+  if (process.env.NODE_ENV === "production") return !publicDemoKeepsSeedPassword();
   return process.env.SEED_FORCE_PASSWORD_CHANGE !== "false";
+}
+
+/**
+ * Public read-only-style demo hosts (e.g. the no-database Vercel demo) where many visitors share
+ * the documented demo accounts: a forced change would lock everyone else out. Requires BOTH
+ * ALLOW_DEMO_SEED_PASSWORD=true and SEED_FORCE_PASSWORD_CHANGE=false; never set these on a live host.
+ */
+export function publicDemoKeepsSeedPassword(): boolean {
+  return (
+    process.env.ALLOW_DEMO_SEED_PASSWORD === "true" &&
+    process.env.SEED_FORCE_PASSWORD_CHANGE === "false"
+  );
 }
 
 export function assertDemoSeedAllowed(scriptName: string): void {

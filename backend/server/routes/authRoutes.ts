@@ -273,7 +273,7 @@ authRouter.post("/api/auth/login", loginLimiter, async (req, res) => {
     let mustChange = user.mustChangePassword;
     if (
       isDefaultSeedPassword(password) &&
-      (seedForcePasswordChange() || process.env.NODE_ENV === "production")
+      seedForcePasswordChange()
     ) {
       mustChange = true;
       if (!user.mustChangePassword) {
